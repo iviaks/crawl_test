@@ -59,9 +59,9 @@ class Parser:
         _tag = tree.cssselect('title')
 
         if len(_tag):
-            title = _tag[0].text
+            title = _tag[0].text_content().strip()
 
-        return title.strip() if len(_tag) else None
+        return title if len(_tag) else None
 
     def get_images(self, tree=None, url=None):
         images = tree.cssselect('img')

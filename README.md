@@ -12,3 +12,7 @@
 * Run `docker-compose run mongo bash`
   * Run `mongo mongo/testing`
   * Run `db.urls.find()`
+
+## How to run tests?
+
+* Run `python tests.py`
