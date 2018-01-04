@@ -6,3 +6,9 @@ services:
     volumes:
       - .:/app
     command: bash
+    environment:
+      - MONGO_HOST=mongo
+    depends_on:
+      - mongo
+  mongo:
+    image: mongo:3.0.15
