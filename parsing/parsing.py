@@ -16,13 +16,14 @@ def format_urls(*args):
 
 class Parser:
     _urls = None
+    _locked = {}
     data = []
 
-    def __init__(self, input_path=None, *args, **kwargs):
-        self._urls = []
-        with open(input_path) as file:
-            for line in file:
-                self._urls.append(line.strip())
+    def __init__(self, urls=None, *args, **kwargs):
+        self._urls = urls
+
+    def set_urls(self, urls=[], *args, **kwargs):
+        self._urls = urls
 
     def get_tree(self, _html):
         return html.fromstring(_html)
@@ -91,12 +92,20 @@ class Parser:
         return _links
 
     async def _parsing(self, url):
+
+        if self._locked.get(url):
+            return None
+
         async with aiohttp.ClientSession() as session:
-            with async_timeout.timeout(10):
+            print('Processing: {}'.format(url))
+            with async_timeout.timeout(50):
                 async with session.get(url) as response:
                     if response.status == 200:
                         html = await response.text()
                         tree = self.get_tree(html)
+
+                        self._locked[url] = True
+
                         self.data.append({
                             'url': url,
                             'keywords': self.get_keywords(tree),
@@ -106,11 +115,15 @@ class Parser:
                             'links': self.get_links(tree),
                         })
 
-    def __call__(self, output=None, *args, **kwargs):
-        loop = asyncio.get_event_loop()
+    @property
+    async def results(self, *args, **kwargs):
         tasks = [self._parsing(url) for url in self._urls]
-        loop.run_until_complete(asyncio.wait(tasks))
-        loop.close()
+        await asyncio.wait(tasks)
+        return self.data
+
+    async def save(self, output=None, *args, **kwargs):
+        tasks = [self._parsing(url) for url in self._urls]
+        await asyncio.wait(tasks)
 
         with open(output, 'w') as file:
             json.dump(self.data, file, indent=2)
@@ -136,5 +149,13 @@ if __name__ == '__main__':
     if not os.path.exists(arguments.input):
         sys.exit('Input file does not exists')
 
-    parser = Parser(arguments.input)
-    parser(arguments.output)
+    with open(arguments.input) as file:
+        urls = []
+        for line in file:
+            urls.append(line.strip())
+
+    parser = Parser(urls)
+
+    loop = asyncio.new_event_loop()
+    loop.run_until_complete(parser.save(arguments.output))
+    loop.close()

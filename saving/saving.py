@@ -8,28 +8,28 @@ import motor.motor_asyncio
 
 
 class MongoDB:
-    def __init__(self, *args, **kwargs):
+    def __init__(
+        self, database='testing',
+        collection='urls', loop=None, *args, **kwargs
+    ):
         client = motor.motor_asyncio.AsyncIOMotorClient(
             os.environ.get('MONGO_HOST', 'localhost'),
             27017
         )
-        self.db = client[kwargs.get('database', 'test_database')]
-        self.collection = self.db[kwargs.get('collection', 'urls')]
+
+        self.db = client[database]
+        self.collection = self.db[collection]
 
     async def _insert(self, document):
-        result = await self.collection.insert_one(document)
-        print(result.inserted_id)
+        await self.collection.insert_one(document)
 
-    def save(self, data={}, *args, **kwargs):
-        loop = asyncio.get_event_loop()
-
+    async def save(self, data={}, *args, **kwargs):
         if isinstance(data, list):
             tasks = [self._insert(document) for document in data]
         else:
             tasks = [self._insert(data)]
 
-        loop.run_until_complete(asyncio.wait(tasks))
-        loop.close()
+        await asyncio.wait(tasks)
 
 
 if __name__ == '__main__':
@@ -58,10 +58,14 @@ if __name__ == '__main__':
     if not os.path.exists(arguments.input):
         sys.exit('Input file does not exists')
 
-    mongo = MongoDB(
+    database = MongoDB(
         database=arguments.database,
         collection=arguments.collection
     )
 
     with open(arguments.input) as file:
-        mongo.save(json.load(file))
+        loop = asyncio.get_event_loop()
+        loop.run_until_complete(database.save(json.load(file)))
+        loop.close()
+
+    del database
